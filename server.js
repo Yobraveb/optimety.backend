@@ -1,20 +1,18 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const Message = require('./models/Message');
+const { Message, sequelize } = require('./models/Message');
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection failed:', err));
+// Confirm DB connection
+sequelize.authenticate()
+  .then(() => console.log('MySQL connected'))
+  .catch(err => console.error('MySQL connection failed:', err));
 
 app.post('/api/contact', async (req, res) => {
   const { name, email, message } = req.body;
@@ -23,8 +21,7 @@ app.post('/api/contact', async (req, res) => {
   }
 
   try {
-    const newMessage = new Message({ name, email, message });
-    await newMessage.save();
+    const newMsg = await Message.create({ name, email, message });
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -42,11 +39,11 @@ app.post('/api/contact', async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
+    res.status(201).json({ message: `Thank you, ${name}. Your message was sent and saved.` });
 
-    res.status(201).json({ message: `Thank you, ${name}. Your message was sent successfully.` });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error. Message not sent.' });
+    res.status(500).json({ error: 'Failed to send or save message.' });
   }
 });
 
